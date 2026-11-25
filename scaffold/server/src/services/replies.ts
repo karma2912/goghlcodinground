@@ -1,3 +1,4 @@
+import { assertCanSend } from '../billing/service.js';
 import { isDuplicateKey, messages, type MessageDoc } from '../db.js';
 import { notifyOutbox } from '../outbox/signal.js';
 import { publishBestEffort } from '../realtime/events.js';
@@ -19,6 +20,7 @@ export interface ReplyInput {
  */
 export async function createReply(input: ReplyInput): Promise<{ created: boolean }> {
   assertWorkspace(input.workspace);
+  await assertCanSend(input.workspace); // bonus: a canceled workspace gets 402 and nothing is stored or sent
   const now = new Date();
   await touchConversation(input.workspace, input.contact, now);
   const doc: MessageDoc = {

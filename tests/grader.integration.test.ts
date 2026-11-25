@@ -128,7 +128,7 @@ describe('POST /__grader/reset', () => {
     await r.set(SESSION_PREFIX + 'probe', '1');
     assert.equal((await post('/__grader/reset', {})).status, 200);
     const snap = await snapshot();
-    assert.deepEqual(snap.workspaces.ws_acme, { contacts: {}, outbound: {} });
+    assert.deepEqual(snap.workspaces.ws_acme, { contacts: {}, outbound: {}, billing: { status: 'none', seats: 0, can_send: true } });
     assert.equal(await r.get(APP_PREFIX + 'probe'), null);
     assert.equal(await r.get(SESSION_PREFIX + 'probe'), '1');
     await r.del(SESSION_PREFIX + 'probe');

@@ -218,7 +218,7 @@ describe('rule: grader endpoints answer 401 without the right x-grader-token', (
     const bad = { 'content-type': 'application/json', 'x-grader-token': 'nope' };
     await call('POST', '/__grader/reply', endpoints[2][2], bad);
     await call('POST', '/__grader/claim', endpoints[3][2], bad);
-    assert.deepEqual((await snapshot()).workspaces.ws_acme, { contacts: {}, outbound: {} });
+    assert.deepEqual((await snapshot()).workspaces.ws_acme, { contacts: {}, outbound: {}, billing: { status: 'none', seats: 0, can_send: true } });
   });
 });
 

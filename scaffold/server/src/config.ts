@@ -71,6 +71,12 @@ export const config = {
     clientSecret: required('OIDC_CLIENT_SECRET'),
     redirectUri: required('OIDC_REDIRECT_URI'),
   },
+  paybox: {
+    url: required('PAYBOX_URL'),
+    secretKey: required('PAYBOX_SECRET_KEY'),
+    publishableKey: required('PAYBOX_PUBLISHABLE_KEY'),
+    webhookSecret: required('PAYBOX_WEBHOOK_SECRET'),
+  },
   realtime: {
     streamMaxLen: requiredNumber('EVENTS_STREAM_MAXLEN'),
     heartbeatMs: requiredNumber('WS_HEARTBEAT_MS'),

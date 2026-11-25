@@ -1,3 +1,4 @@
+import { billingSnapshot } from '../billing/service.js';
 import { workspaceIds } from '../config.js';
 import { conversations, messages, type OutboundStatus } from '../db.js';
 
@@ -9,6 +10,7 @@ interface ContactSnapshot {
 interface WorkspaceSnapshot {
   contacts: Record<string, ContactSnapshot>;
   outbound: Record<string, OutboundStatus>;
+  billing?: Awaited<ReturnType<typeof billingSnapshot>>;
 }
 
 export interface Snapshot {
@@ -40,6 +42,8 @@ export async function buildSnapshot(): Promise<Snapshot> {
 
     const outbound = msgCol.find({ workspace: ws, direction: 'outbound' }, { projection: { clientRef: 1, status: 1 } });
     for await (const m of outbound) snap.outbound[m.clientRef!] = m.status!;
+
+    snap.billing = await billingSnapshot(ws); // bonus: { status, seats, can_send }
   }
   return out;
 }
