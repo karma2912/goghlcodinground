@@ -26,6 +26,7 @@ export interface MessageDoc {
   messageId?: string; // Pigeon's pmsg_ id
   occurredAt?: Date;
   eventId?: string | null; // Pigeon event that first delivered it (debugging)
+  emitted?: boolean; // its message.inbound frame has been published
   // outbound only
   clientRef?: string;
   status?: OutboundStatus;

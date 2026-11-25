@@ -71,6 +71,10 @@ export const config = {
     clientSecret: required('OIDC_CLIENT_SECRET'),
     redirectUri: required('OIDC_REDIRECT_URI'),
   },
+  realtime: {
+    streamMaxLen: requiredNumber('EVENTS_STREAM_MAXLEN'),
+    heartbeatMs: requiredNumber('WS_HEARTBEAT_MS'),
+  },
   session: {
     ttlSeconds: requiredNumber('SESSION_TTL_SECONDS'),
     loginStateTtlSeconds: requiredNumber('LOGIN_STATE_TTL_SECONDS'),

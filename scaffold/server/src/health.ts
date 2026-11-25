@@ -8,17 +8,18 @@ let initialised = false;
  * /healthz stays 503 until this has finished, so no traffic arrives before
  * the unique indexes that make webhooks and replies idempotent exist.
  */
-export async function initialise(): Promise<void> {
+export async function initialise(opts: { beforeReady?: () => Promise<void> } = {}): Promise<void> {
   for (;;) {
     try {
       await ensureIndexes();
-      initialised = true;
-      return;
+      break;
     } catch (err) {
       console.error('startup: MongoDB not ready, retrying in 1 s:', (err as Error).message);
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
+  await opts.beforeReady?.(); // e.g. the realtime hub subscribing to Redis
+  initialised = true;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {

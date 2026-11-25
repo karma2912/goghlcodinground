@@ -1,6 +1,7 @@
 import { conversations, isDuplicateKey } from '../db.js';
 import { workspaceExists } from '../config.js';
 import { HttpError } from '../errors.js';
+import { publishBestEffort } from '../realtime/events.js';
 
 export function assertWorkspace(workspace: string): void {
   if (!workspaceExists(workspace)) throw new HttpError(404, `unknown workspace ${workspace}`);
@@ -43,19 +44,25 @@ export async function claimConversation(workspace: string, contact: string, agen
   const now = new Date();
   const freeOrMine = { workspace, contact, $or: [{ assignee: null }, { assignee: agent }] };
   const take = { $set: { assignee: agent } };
+  // Success means the filter matched (free or ours) or the upsert inserted.
+  // 'before' tells a new assignment apart from the holder claiming again.
+  const won = (before: { assignee: string | null } | null): ClaimResult => {
+    if (!before || before.assignee !== agent) publishBestEffort(workspace, { type: 'conversation.assigned', contact, assignee: agent });
+    return { ok: true, assignee: agent };
+  };
   try {
-    const doc = await col.findOneAndUpdate(
+    const before = await col.findOneAndUpdate(
       freeOrMine,
       { ...take, $setOnInsert: { status: 'open' as const, createdAt: now, lastActivityAt: now } },
-      { upsert: true, returnDocument: 'after' },
+      { upsert: true, returnDocument: 'before', projection: { assignee: 1 } },
     );
-    if (doc?.assignee === agent) return { ok: true, assignee: agent };
+    return won(before);
   } catch (err) {
     if (!isDuplicateKey(err)) throw err;
     // Lost an insert race, or the conversation is held by someone else.
     // Try once more without upsert: it now exists, so this is a plain CAS.
-    const doc = await col.findOneAndUpdate(freeOrMine, take, { returnDocument: 'after' });
-    if (doc?.assignee === agent) return { ok: true, assignee: agent };
+    const before = await col.findOneAndUpdate(freeOrMine, take, { returnDocument: 'before', projection: { assignee: 1 } });
+    if (before) return won(before);
   }
   const current = await col.findOne({ workspace, contact }, { projection: { assignee: 1 } });
   return { ok: false, assignee: current?.assignee ?? null };

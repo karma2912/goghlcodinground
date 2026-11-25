@@ -1,4 +1,5 @@
 import { messages, type OutboundStatus } from '../db.js';
+import { publishBestEffort } from '../realtime/events.js';
 
 /**
  * Status only moves forward: queued -> sent -> delivered | failed.
@@ -40,8 +41,11 @@ export async function applyStatus(u: StatusUpdate): Promise<'advanced' | 'unchan
     { $set: { sendState: 'accepted', acceptedAt: new Date(), lockedUntil: null, ...(u.pigeonId ? { pigeonId: u.pigeonId } : {}) } },
   );
 
-  const res = await col.updateOne({ ...who, status: { $in: replaceableBy(u.status) } }, { $set: { status: u.status } });
-  if (res.modifiedCount > 0) return 'advanced';
+  const moved = await col.findOneAndUpdate({ ...who, status: { $in: replaceableBy(u.status) } }, { $set: { status: u.status } }, { projection: { contact: 1, clientRef: 1 } });
+  if (moved) {
+    publishBestEffort(u.workspace, { type: 'message.status', contact: moved.contact, client_ref: moved.clientRef!, status: u.status });
+    return 'advanced';
+  }
   if (accepted.matchedCount > 0) return 'unchanged';
   return (await col.countDocuments(who, { limit: 1 })) > 0 ? 'unchanged' : 'unknown';
 }

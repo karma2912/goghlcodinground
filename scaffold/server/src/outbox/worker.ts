@@ -7,6 +7,7 @@ import { replaceableBy } from '../services/status.js';
 import { sendToPigeon, type SendOutcome } from './pigeonClient.js';
 import { startCoolOff, takeSendToken } from './rateLimit.js';
 import { onOutboxNudge } from './signal.js';
+import { publishBestEffort } from '../realtime/events.js';
 
 /** Exponential backoff with ±20 % jitter: base, 2×base, 4×base ... capped. */
 export function backoffMs(attempts: number, baseMs: number, maxMs: number, random = Math.random): number {
@@ -161,7 +162,8 @@ export class OutboxWorker {
       case 'rejected':
         this.opts.log(`${job.clientRef} rejected by Pigeon: ${outcome.reason}; marked failed`);
         await col.updateOne(mine, { $set: { sendState: 'rejected', lockedUntil: null, leaseToken: null, lastError: outcome.reason } });
-        await col.updateOne({ _id: job._id, status: { $in: replaceableBy('failed') } }, { $set: { status: 'failed' } });
+        const failed = await col.updateOne({ _id: job._id, status: { $in: replaceableBy('failed') } }, { $set: { status: 'failed' } });
+        if (failed.modifiedCount > 0) publishBestEffort(job.workspace, { type: 'message.status', contact: job.contact, client_ref: job.clientRef!, status: 'failed' });
         return;
     }
   }

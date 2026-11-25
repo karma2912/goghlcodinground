@@ -1,6 +1,7 @@
 import { ObjectId, type Filter } from 'mongodb';
 import { conversations, messages, type ConversationDoc, type ConversationStatus, type MessageDoc, type OutboundStatus } from '../db.js';
 import { HttpError } from '../errors.js';
+import { publishBestEffort } from '../realtime/events.js';
 import { assertWorkspace } from './conversations.js';
 
 // What the agent UI reads. The grader snapshot and these views agree on
@@ -109,7 +110,9 @@ export async function getConversation(workspace: string, contact: string): Promi
 /** Close or reopen. The assignee is kept, so a reopened conversation returns to its agent. */
 export async function setConversationStatus(workspace: string, contact: string, status: ConversationStatus): Promise<ConversationView> {
   assertWorkspace(workspace);
-  const doc = await (await conversations()).findOneAndUpdate({ workspace, contact }, { $set: { status } }, { returnDocument: 'after' });
-  if (!doc) throw new HttpError(404, 'no such conversation');
-  return view(doc);
+  const col = await conversations();
+  const before = await col.findOneAndUpdate({ workspace, contact }, { $set: { status } }, { returnDocument: 'before' });
+  if (!before) throw new HttpError(404, 'no such conversation');
+  if (before.status !== status) publishBestEffort(workspace, { type: 'conversation.status', contact, status });
+  return view({ ...before, status });
 }

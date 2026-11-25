@@ -1,5 +1,6 @@
 import { isDuplicateKey, messages, type MessageDoc } from '../db.js';
 import { notifyOutbox } from '../outbox/signal.js';
+import { publishBestEffort } from '../realtime/events.js';
 import { assertWorkspace, touchConversation } from './conversations.js';
 
 export interface ReplyInput {
@@ -41,6 +42,7 @@ export async function createReply(input: ReplyInput): Promise<{ created: boolean
   try {
     await (await messages()).insertOne(doc);
     notifyOutbox(); // this instance sends it now instead of at the next poll
+    publishBestEffort(input.workspace, { type: 'message.outbound', contact: input.contact, client_ref: input.clientRef, text: input.text, status: 'queued', author: input.author });
     return { created: true };
   } catch (err) {
     if (isDuplicateKey(err)) return { created: false };
