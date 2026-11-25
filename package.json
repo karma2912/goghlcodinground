@@ -21,6 +21,7 @@
     "scaffold:install": "npm --prefix scaffold/server install && npm --prefix scaffold/web install",
     "scaffold:server": "npm --prefix scaffold/server run dev",
     "scaffold:web": "npm --prefix scaffold/web run dev",
-    "start:server": "npm --prefix scaffold/server start"
+    "start:server": "npm --prefix scaffold/server start",
+    "test": "npm --prefix scaffold/server test"
   }
 }

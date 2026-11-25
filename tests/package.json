@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Tests run with: npm test (from the repository root). They import the server from ../scaffold/server/src."
+}
