@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import { HttpError } from './errors.js';
 import { checkHealth } from './health.js';
 import { graderRouter } from './routes/grader.js';
+import { webhookRouter } from './routes/webhooks.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -15,6 +16,7 @@ export function createApp(): express.Express {
     res.status(health.ok ? 200 : 503).json(health);
   });
 
+  app.use('/webhooks', webhookRouter());
   app.use('/__grader', graderRouter());
 
   app.use((_req, res) => {
