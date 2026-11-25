@@ -1,6 +1,8 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { HttpError } from './errors.js';
 import { checkHealth } from './health.js';
+import { apiRouter } from './routes/api.js';
+import { authRouter } from './routes/auth.js';
 import { graderRouter } from './routes/grader.js';
 import { webhookRouter } from './routes/webhooks.js';
 
@@ -17,6 +19,8 @@ export function createApp(): express.Express {
   });
 
   app.use('/webhooks', webhookRouter());
+  app.use('/auth', authRouter());
+  app.use('/api', apiRouter());
   app.use('/__grader', graderRouter());
 
   app.use((_req, res) => {

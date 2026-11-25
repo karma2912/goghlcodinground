@@ -78,7 +78,8 @@ export async function messages(): Promise<Collection<MessageDoc>> {
 export async function ensureIndexes(): Promise<void> {
   const conv = await conversations();
   await conv.createIndex({ workspace: 1, contact: 1 }, { unique: true });
-  await conv.createIndex({ workspace: 1, lastActivityAt: -1 });
+  // the inbox list: newest activity first, keyset pagination on (lastActivityAt, _id)
+  await conv.createIndex({ workspace: 1, lastActivityAt: -1, _id: -1 });
 
   const msg = await messages();
   // an inbound Pigeon message is stored once

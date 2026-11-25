@@ -71,6 +71,12 @@ export const config = {
     clientSecret: required('OIDC_CLIENT_SECRET'),
     redirectUri: required('OIDC_REDIRECT_URI'),
   },
+  session: {
+    ttlSeconds: requiredNumber('SESSION_TTL_SECONDS'),
+    loginStateTtlSeconds: requiredNumber('LOGIN_STATE_TTL_SECONDS'),
+    /** Secure cookies whenever the app is served over https. */
+    secureCookies: required('WEB_ORIGIN').startsWith('https://'),
+  },
 };
 
 export function workspaceExists(workspace: unknown): workspace is string {
