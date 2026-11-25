@@ -2,10 +2,13 @@ import express, { Router } from 'express';
 import { config, workspaceExists } from '../config.js';
 import { wrap } from '../errors.js';
 import { recordInbound } from '../services/inbound.js';
+import { applyStatus, isOutboundStatus } from '../services/status.js';
+import type { OutboundStatus } from '../db.js';
 import { verifySignature } from '../webhooks/signature.js';
 
 type Parsed =
   | { kind: 'inbound'; workspace: string; contact: string; messageId: string; text: string; occurredAt: Date }
+  | { kind: 'status'; workspace: string; clientRef: string | null; pigeonId: string | null; status: OutboundStatus }
   | { kind: 'ignore'; why: string }
   | { kind: 'invalid'; why: string };
 
@@ -23,12 +26,22 @@ export function parsePigeonEvent(raw: Buffer): Parsed {
   if (!isObject(body) || !nonEmpty(body.type)) return { kind: 'invalid', why: 'no event type' };
 
   // Pigeon adds event types without notice: acknowledge and ignore.
-  if (body.type !== 'message.inbound') return { kind: 'ignore', why: `event type ${body.type} not handled` };
+  if (body.type !== 'message.inbound' && body.type !== 'message.status') return { kind: 'ignore', why: `event type ${body.type} not handled` };
 
   if (!nonEmpty(body.workspace)) return { kind: 'invalid', why: 'no workspace' };
   if (!workspaceExists(body.workspace)) return { kind: 'ignore', why: `unknown workspace ${body.workspace}` };
 
   const data = body.data;
+  if (body.type === 'message.status') {
+    if (!isObject(data) || !nonEmpty(data.status)) return { kind: 'invalid', why: 'data.status is required' };
+    const clientRef = nonEmpty(data.client_ref) ? data.client_ref : null;
+    const pigeonId = nonEmpty(data.message_id) ? data.message_id : null;
+    if (!clientRef && !pigeonId) return { kind: 'invalid', why: 'data.client_ref or data.message_id is required' };
+    // a status value we do not know yet: acknowledge, keep what we have
+    if (!isOutboundStatus(data.status) || data.status === 'queued') return { kind: 'ignore', why: `status ${data.status} not handled` };
+    return { kind: 'status', workspace: body.workspace, clientRef, pigeonId, status: data.status };
+  }
+
   if (!isObject(data) || !nonEmpty(data.message_id) || !nonEmpty(data.from) || typeof data.text !== 'string') {
     return { kind: 'invalid', why: 'data.message_id, data.from and data.text are required' };
   }
@@ -42,8 +55,10 @@ export function parsePigeonEvent(raw: Buffer): Parsed {
  * POST /webhooks/pigeon. Answers, per PIGEON.md:
  *   bad/missing signature, or timestamp > 5 min away   401
  *   verified but unparseable                           400
- *   unknown type / unknown workspace / status events   200, ignored
+ *   unknown type / unknown workspace                   200, ignored
+ *   status for a message we never sent                 200, ignored
  *   inbound message stored (or already stored)         200
+ *   status applied (forward only, or already newer)    200
  */
 export function webhookRouter(): Router {
   const r = Router();
@@ -66,8 +81,12 @@ export function webhookRouter(): Router {
         return;
       }
       if (event.kind === 'ignore') {
-        // message.status lands here until the outbox handles it
         res.status(200).json({ ok: true, ignored: event.why });
+        return;
+      }
+      if (event.kind === 'status') {
+        const result = await applyStatus(event);
+        res.status(200).json({ ok: true, status: result });
         return;
       }
 

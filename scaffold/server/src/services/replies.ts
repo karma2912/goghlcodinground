@@ -1,4 +1,5 @@
 import { isDuplicateKey, messages, type MessageDoc } from '../db.js';
+import { notifyOutbox } from '../outbox/signal.js';
 import { assertWorkspace, touchConversation } from './conversations.js';
 
 export interface ReplyInput {
@@ -29,12 +30,17 @@ export async function createReply(input: ReplyInput): Promise<{ created: boolean
     status: 'queued',
     author: input.author,
     pigeonId: null,
+    sendState: 'pending',
     attempts: 0,
     nextAttemptAt: now,
     lockedUntil: null,
+    leaseToken: null,
+    lastError: null,
+    acceptedAt: null,
   };
   try {
     await (await messages()).insertOne(doc);
+    notifyOutbox(); // this instance sends it now instead of at the next poll
     return { created: true };
   } catch (err) {
     if (isDuplicateKey(err)) return { created: false };

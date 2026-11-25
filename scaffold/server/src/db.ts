@@ -31,10 +31,24 @@ export interface MessageDoc {
   status?: OutboundStatus;
   author?: string; // agent id that wrote the reply
   pigeonId?: string | null; // Pigeon's pm_ id once accepted
-  attempts?: number;
+  /**
+   * Whether the outbox still has to send it. Separate from `status` (what the
+   * agent sees): a reply stays `queued` after Pigeon accepts it until the
+   * `sent` webhook arrives, but it must not be sent again.
+   *   pending   the worker must (re)send it
+   *   accepted  Pigeon has it (HTTP 200, or any status webhook for it)
+   *   rejected  Pigeon refused it for good (4xx other than 429); status failed
+   */
+  sendState?: SendState;
+  attempts?: number; // HTTP requests made for it
   nextAttemptAt?: Date; // when the sender may try again
   lockedUntil?: Date | null; // lease held by a sender worker
+  leaseToken?: string | null; // proves which lease a worker's write belongs to
+  lastError?: string | null;
+  acceptedAt?: Date | null;
 }
+
+export type SendState = 'pending' | 'accepted' | 'rejected';
 
 // --------------------------------------------------------------- connection
 
@@ -80,7 +94,9 @@ export async function ensureIndexes(): Promise<void> {
   // thread view and snapshot: oldest first, by occurred_at then message id
   await msg.createIndex({ workspace: 1, contact: 1, direction: 1, occurredAt: 1, messageId: 1 });
   // the sender worker looks for due replies
-  await msg.createIndex({ status: 1, nextAttemptAt: 1 }, { partialFilterExpression: { direction: 'outbound' } });
+  await msg.createIndex({ sendState: 1, nextAttemptAt: 1 }, { partialFilterExpression: { sendState: 'pending' } });
+  // status webhooks that only carry Pigeon's id
+  await msg.createIndex({ workspace: 1, pigeonId: 1 }, { partialFilterExpression: { pigeonId: { $type: 'string' } } });
 }
 
 export function isDuplicateKey(err: unknown): boolean {

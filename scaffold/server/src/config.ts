@@ -37,6 +37,12 @@ export function parseWorkspaces(env: NodeJS.ProcessEnv): Record<string, string> 
   return keys;
 }
 
+function requiredNumber(name: string): number {
+  const value = Number(required(name));
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be a positive number`);
+  return value;
+}
+
 export const config = {
   port: Number(required('PORT')),
   webOrigin: required('WEB_ORIGIN'),
@@ -49,6 +55,15 @@ export const config = {
     webhookSecret: required('PIGEON_WEBHOOK_SECRET'),
     /** workspace id -> Pigeon API key */
     apiKeys: parseWorkspaces(process.env),
+    sendTimeoutMs: requiredNumber('PIGEON_SEND_TIMEOUT_MS'),
+    rateBurst: requiredNumber('PIGEON_RATE_BURST'),
+    ratePerSec: requiredNumber('PIGEON_RATE_PER_SEC'),
+  },
+  outbox: {
+    leaseMs: requiredNumber('OUTBOX_LEASE_MS'),
+    backoffBaseMs: requiredNumber('OUTBOX_BACKOFF_BASE_MS'),
+    backoffMaxMs: requiredNumber('OUTBOX_BACKOFF_MAX_MS'),
+    pollMs: requiredNumber('OUTBOX_POLL_MS'),
   },
   oidc: {
     issuer: required('OIDC_ISSUER'),
